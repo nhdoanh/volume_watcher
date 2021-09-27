@@ -126,12 +126,27 @@
                                                object:nil];
     // 需要开启该功能以便监听系统音量
     [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
+    
+    if (@available(iOS 15, *)) {
+        @try {
+            [[AVAudioSession sharedInstance] addObserver:self forKeyPath:@"outputVolume" options:NSKeyValueObservingOptionNew context:nil];
+        }@catch (id exception) {
+            NSLog(@"add observer outputVolume failed");
+        }
+    }
     return nil;
 }
 
 //flutter不再接收
 - (FlutterError* _Nullable)onCancelWithArguments:(id _Nullable)arguments {
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"AVSystemController_SystemVolumeDidChangeNotification" object:nil];
+    if (@available(iOS 15, *)) {
+        @try {
+            [[AVAudioSession sharedInstance] removeObserver:self forKeyPath:@"outputVolume"];
+        } @catch(id exception) {
+            NSLog(@"remove observer outputVolume failed");
+        }
+    }
     _eventSink = nil;
     return nil;
 }
@@ -149,6 +164,15 @@
             float volume = [[notification.userInfo objectForKey:@"AVSystemController_AudioVolumeNotificationParameter"] floatValue];
             _eventSink(@(volume));
         }
+    }
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+    if ([keyPath isEqualToString:@"outputVolume"]) {
+        _eventSink(@([AVAudioSession sharedInstance].outputVolume));
+    } else {
+        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
     }
 }
 
